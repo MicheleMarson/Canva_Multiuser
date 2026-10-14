@@ -9,9 +9,13 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@liveblocks/client": "^3.24.1",
+    "@liveblocks/react": "^3.24.1",
+    "@supabase/supabase-js": "^2.109.0",
     "next": "16.3.3",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "tldraw": "^5.1.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

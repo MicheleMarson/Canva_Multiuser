@@ -1,69 +1,218 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import type { User } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { createNewBoardInDatabase, getAllBoardsFromDatabase } from '@/services/boardService' // Import our new server tool
+import { supabase } from '@/services/supabase'
+
+interface Board {
+  id: string
+  [key: string]: string | number | boolean | null
+}
+
+export default function Dashboard() {
+  const router = useRouter()
+  const [user, setUser] = useState<null | User>(null)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [authLoading, setAuthLoading] = useState(true)
+  const [allBoards, setAllBoards] = useState<Board[]>([])
+  const [isCreating, setIsCreating] = useState(false)
+  const [showPopup, setShowPopup] = useState(false) // State to control the popup visibility
+  const [boardName, setBoardName] = useState('') // State for the new board name
+
+  useEffect(() => {
+    // Fetch all boards when the component mounts
+    const fetchBoards = async () => {
+      const { data, error } = await getAllBoardsFromDatabase()
+      if (!error) {
+        setAllBoards(data!)
+      }
+    }
+    fetchBoards()
+  }, [user]) // Re-fetch boards whenever the user changes
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+      setAuthLoading(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+    // 2. Handle User Sign Up
+  async function handleSignUp(e: React.FormEvent) {
+    e.preventDefault()
+    const { data, error } = await supabase.auth.signUp({ email, password })
+    console.log("D", data)
+    if (error) alert(`Sign up failed: ${error.message}`)
+    else alert('Check your email for a validation confirmation link!')
+  }
+
+  // 3. Handle User Login
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault()
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) alert(`Login failed: ${error.message}`)
+  }
+
+    // 4. Handle Logout
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    setUser(null)
+  }
+
+  // 5. Handle Creating a Board tied to the user's specific account ID
+  async function handleSubmitCreate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!boardName.trim()) return
+    setIsCreating(true)
+
+    // Call our service to generate the row
+    const { data, error } = await createNewBoardInDatabase(boardName)
+
+    if (error) {
+      alert(`Failed to create: ${error.message}`)
+      setIsCreating(false)
+    } else {
+      router.push(`/board/${data!.id}`)
+    }
+  }
+
+  if (authLoading) return <div style={{ padding: '40px', fontFamily: 'sans-serif' }}>Securing authorization pipelines...</div>
+
+    // 🚪 SCREEN A: Show Login / Registration if the visitor is an anonymous guest
+  if (!user) {
+    return (
+      <div style={{ padding: '60px', fontFamily: 'sans-serif', maxWidth: '400px', margin: '0 auto' }}>
+        <h1 style={{ fontSize: '28px', marginBottom: '20px' }}>Secure Workspaces login</h1>
+        <form style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <input type="email" placeholder="Your Email" value={email} onChange={e => setEmail(e.target.value)} style={{ padding: '12px', borderRadius: '6px', border: '1px solid #ccc' }} />
+          <input type="password" placeholder="Your Password" value={password} onChange={e => setPassword(e.target.value)} style={{ padding: '12px', borderRadius: '6px', border: '1px solid #ccc' }} />
+          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+            <button type="button" onClick={handleLogin} style={{ flex: 1, padding: '12px', backgroundColor: '#0070f3', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Log In</button>
+            <button type="button" onClick={handleSignUp} style={{ flex: 1, padding: '12px', backgroundColor: '#e2e8f0', color: '#333', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Sign Up</button>
+          </div>
+        </form>
+      </div>
+    )
+  }
+  
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div style={{ padding: '60px', fontFamily: 'sans-serif', maxWidth: '600px', margin: '0 auto' }}>
+      <h1 style={{ fontSize: '32px', marginBottom: '10px' }}>Your Portfolio Workspaces 🚀</h1>
+       <button onClick={handleLogout} style={{ flex: 1, padding: '12px', backgroundColor: '#0070f3', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Log Out</button>
+      <p style={{ color: '#666', marginBottom: '30px' }}>Create an architecture layout and watch data streams match live.</p>
+      {allBoards ?  (
+        <ul style={{ listStyle: 'none', padding: 0, marginBottom: '30px' }}>
+          {allBoards.map((board) => (
+            <li key={board.id} style={{ marginBottom: '10px' }}>
+              <a href={`/board/${board.id}`} style={{ color: '#0070f3', textDecoration: 'underline' }}>
+                {board.name || `Board ${board.id}`}
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <button 
+        onClick={() => setShowPopup(true)}
+        disabled={isCreating}
+        style={{ 
+          padding: '15px 30px', 
+          fontSize: '18px', 
+          backgroundColor: isCreating ? '#ccc' : '#0070f3', 
+          color: 'white', 
+          border: 'none', 
+          borderRadius: '8px', 
+          cursor: isCreating ? 'not-allowed' : 'pointer', 
+          fontWeight: 'bold' 
+        }}
+      >
+        {isCreating ? 'Initializing Board in Cloud...' : '+ Create New Multiplayer Board'}
+      </button>
+
+       {/* 🌟 THE POPUP MODAL ACCORDION WINDOW 🌟 */}
+      {showPopup && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', // Darkens the canvas behind the popup
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          color: 'black'
+        }}>
+          <form 
+            onSubmit={handleSubmitCreate}
+            style={{
+              backgroundColor: 'white',
+              padding: '30px',
+              borderRadius: '12px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              width: '400px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '15px'
+            }}
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+            <h3 style={{ margin: 0, fontSize: '20px' }}>Name your new workspace</h3>
+            
+            <input 
+              type="text" 
+              value={boardName}
+              onChange={(e) => setBoardName(e.target.value)}
+              disabled={isCreating}
+              autoFocus
+              style={{
+                padding: '12px',
+                fontSize: '16px',
+                borderRadius: '6px',
+                border: '1px solid #ccc',
+                outline: 'none'
+              }}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+              {/* Cancel Button */}
+              <button 
+                type="button"
+                onClick={() => { setShowPopup(false); setBoardName(''); }}
+                disabled={isCreating}
+                style={{ padding: '10px 15px', backgroundColor: '#eee', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              
+              {/* Submit Button */}
+              <button 
+                type="submit"
+                disabled={isCreating}
+                style={{ 
+                  padding: '10px 15px', 
+                  backgroundColor: isCreating ? '#ccc' : '#0070f3', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '6px', 
+                  cursor: isCreating ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold' 
+                }}
+              >
+                {isCreating ? 'Creating...' : 'Create Board'}
+              </button>
+            </div>
+          </form>
         </div>
-      </main>
+      )}
     </div>
-  );
+  )
 }
